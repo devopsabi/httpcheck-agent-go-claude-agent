@@ -1,10 +1,10 @@
 ☁  cert-agent  go run . -config checks.yaml
 [tool] list_targets {}
-[tool] run_cert_checks {"hosts":["www.google.com","devopsabi.de","devopsabhi.com"]}
+[tool] run_cert_checks {"hosts":["www.google.com","devopsabi.de","devopsabi.com"]}
 # Certificate Expiry Report
 
 ## Summary
-Two of the three configured targets are critical. The production host `devopsabi.de` has a Let's Encrypt certificate with 14 days left. `devopsabhi.com` could not be checked because its DNS name does not resolve. `www.google.com` is healthy. No hosts were skipped.
+Both production customer-facing hosts, devopsabi.de and devopsabi.com, are critical. Each has 14 days left, which is under the 21-day critical threshold of the prod-public check. Both certificates come from Let's Encrypt and were issued within about a minute of each other. Auto-renewal (cert-manager) is therefore probably broken, because these certificates should have renewed at 30 days left. www.google.com is healthy. All three configured targets were checked, and none were skipped.
 
 **Critical: 2 / Warning: 0 / OK: 1 / Skipped: 0**
 
@@ -12,22 +12,22 @@ Two of the three configured targets are critical. The production host `devopsabi
 
 ### [CRITICAL] devopsabi.de
 - **Check**: prod-public (warn 45 days, critical 21 days)
-- **Problem**: The certificate expires in 14 days, which is below the critical threshold of 21. It is a production public host. Once the certificate expires, customers will get browser errors. The issuer is Let's Encrypt (CN=YE2), and these certificates should renew automatically at 30 days left. At 14 days, auto-renewal (cert-manager or similar) is probably broken. The chain is valid and the host uses TLS 1.3. The certificate has a lifetime of 89 days and was issued on 2026-08-20.
+- **Problem**: The certificate expires in 14 days. It is a Let's Encrypt certificate (issuer CN=YE2), which should have renewed at 30 days left. Auto-renewal (cert-manager) is probably broken. If it expires, customers will see browser errors. The chain is valid, TLS 1.3 is in use, and there are no other findings.
 - **Days left**: 14 (expires 2026-11-18)
-- **Next step**: Renew the certificate now, either manually or by forcing a cert-manager renewal. Then find out why automatic renewal did not run. Check the cert-manager logs, the state of the Certificate and Order resources, and whether the ACME challenge can succeed (DNS or HTTP-01).
+- **Next step**: Check cert-manager (or the ACME client in use). Look at the Certificate, Order and Challenge resources, the logs, and whether the ACME challenge is failing. Fix the cause and force a renewal. Then confirm the new expiry date.
 
-### [CRITICAL] devopsabhi.com
-- **Check**: defaults (warn 30 days, critical 14 days)
-- **Problem**: The connection failed with `dial tcp: lookup devopsabhi.com: no such host`. The DNS name does not resolve, so no certificate could be inspected. Expiry, chain and policy status are unknown.
-- **Days left**: unknown (no certificate retrieved)
-- **Next step**: Check that the domain is registered and not expired, and that its DNS records exist and resolve. If the host was decommissioned, remove it from the target list. If the name is a typo, correct it. For example, `devopsabi.de` may have been intended. Then re-run the check.
+### [CRITICAL] devopsabi.com
+- **Check**: prod-public (warn 45 days, critical 21 days)
+- **Problem**: The certificate expires in 14 days. It is a Let's Encrypt certificate (issuer CN=YE1), which should have renewed at 30 days left. Auto-renewal (cert-manager) is probably broken. If it expires, customers will see browser errors. The chain is valid, TLS 1.3 is in use, and there are no other findings.
+- **Days left**: 14 (expires 2026-11-18)
+- **Next step**: Handle this together with devopsabi.de. Fix the renewal pipeline, force a renewal, and verify the new certificate is served.
 
 ## Patterns
-- Both critical findings are availability problems for a public name. Their causes differ: one is an expiring certificate and the other is a DNS resolution failure. The tool results do not show a shared cause.
-- The `devopsabi.de` Let's Encrypt certificate is inside the 30-day renewal window. Check any other cert-manager-managed certificates for the same renewal problem.
+- **Same expiry date**: devopsabi.de and devopsabi.com were issued on 2026-08-20 and both expire on 2026-11-18. They were issued about a minute apart, so one shared renewal job or cert-manager setup probably handles both. That job is probably the single point of failure. I can't tell the cause from these results.
+- **Renewal window missed**: Both certificates are already past the 30-day renewal point. This supports the theory that renewal has been failing for about two weeks.
 
 ## Healthy hosts
-- www.google.com: 56 days left (expires 2026-12-30)
+- www.google.com: 56 days left
 
 STATUS: CRITICAL
 exit status 2
